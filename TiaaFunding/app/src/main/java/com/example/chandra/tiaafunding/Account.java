@@ -12,6 +12,7 @@ public class Account {
     String typeOfAccount;
 
     ArrayList<Account> listOfAccount;
+    ArrayList<Account> achSetupAccounts;
 
     public double getBalance() {
         return balance;
@@ -37,6 +38,8 @@ public class Account {
         this.typeOfAccount = typeOfAccount;
     }
 
+
+
     public Account(String accountnumber,double balance,String typeOfAccount){
         this.accountnumber = accountnumber;
         this.balance = balance;
@@ -46,9 +49,14 @@ public class Account {
 
     public Account(){
         listOfAccount = new ArrayList<>();
-        listOfAccount.add(new Account("A5734567",4567.23,"IRA"));
+        achSetupAccounts = new ArrayList<>();
+        listOfAccount.add(new Account("A5734567",4567.23,"Retirement"));
         listOfAccount.add(new Account("A581234",6000,"Personal Portfolio"));
-        listOfAccount.add(new Account("A5178945",23456,"Brokerage"));
+        listOfAccount.add(new Account("A5178945",23456,"Pension"));
+
+        achSetupAccounts.add(new Account("XXX3456",0,"Bank of America Checking"));
+        achSetupAccounts.add(new Account("XXX1234",0,"Bank of America Savings"));
+        achSetupAccounts.add(new Account("XX156",0,"Chase Checking"));
 
     }
 
@@ -56,5 +64,7 @@ public class Account {
         return listOfAccount;
     }
 
-
+    public ArrayList<Account> getAchSetupAccounts() {
+        return achSetupAccounts;
+    }
 }

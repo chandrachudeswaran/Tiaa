@@ -157,6 +157,8 @@ public class Home extends AppCompatActivity implements TextToSpeech.OnInitListen
         }
     }
 
+
+
     @Override
     public void onBackPressed() {
         finish();
@@ -168,7 +170,7 @@ public class Home extends AppCompatActivity implements TextToSpeech.OnInitListen
             mTts.setLanguage(Locale.US);
             HashMap<String, String> params = new HashMap<>();
             params.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "stringId");
-            mTts.speak("what do you want to do", TextToSpeech.QUEUE_FLUSH, params);
+            mTts.speak("How can I help you today", TextToSpeech.QUEUE_FLUSH, params);
             mTts.setOnUtteranceCompletedListener(new TextToSpeech.OnUtteranceCompletedListener() {
                 @Override
                 public void onUtteranceCompleted(String utteranceId) {
