@@ -2,11 +2,9 @@ package com.example.chandra.tiaafunding;
 
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
-import android.os.Handler;
-import android.os.Message;
+import android.content.SharedPreferences;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
@@ -17,21 +15,30 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.chandra.tiaafunding.dto.UserAccounts;
+import com.example.chandra.tiaafunding.dto.UserInfo;
+import com.example.chandra.tiaafunding.network.RequestParams;
+import com.example.chandra.tiaafunding.network.RestClient;
+import com.example.chandra.tiaafunding.util.SharedPreferenceHelper;
+
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.TimeUnit;
 
-public class Home extends AppCompatActivity implements TextToSpeech.OnInitListener{
+
+public class Home extends AppCompatActivity implements TextToSpeech.OnInitListener, RestClient.TransferToActivity{
 
     ListView listView;
     ListAdapter adapter;
     TextView balance;
     private Toolbar mToolbar;
     public TextToSpeech mTts;
-
-
+    UserInfo info;
+    String function;
+    ArrayList<UserAccounts>list;
 
     private final int REQ_CODE_SPEECH_INPUT = 100;
     private final int MY_DATA_CHECK_CODE= 200;
@@ -48,19 +55,16 @@ public class Home extends AppCompatActivity implements TextToSpeech.OnInitListen
         setTitle("  My Accounts");
         balance = (TextView)findViewById(R.id.balance);
         listView = (ListView)findViewById(R.id.list);
-        Account account = new Account();
 
-        adapter = new ListAdapter(Home.this,R.layout.listrow,account.getListOfAccount());
-        listView.setAdapter(adapter);
-        adapter.setNotifyOnChange(true);
-        double bal=0.0;
-        for(Account acc:account.getListOfAccount()){
-            bal = bal+ acc.getBalance();
+        if(getIntent().getExtras()!=null){
+            if(getIntent().getExtras().getParcelable("Info")!=null){
+              info  = getIntent().getExtras().getParcelable("Info");
+                SharedPreferenceHelper.putSharedPreferences(Home.this, info);
+            }
         }
-        DecimalFormat df2 = new DecimalFormat("###.##");
-        bal = Double.valueOf(df2.format(bal));
-        balance.setText("$ " + bal);
 
+        Toast.makeText(Home.this,"Hello Mr."+ info.getLastname(),Toast.LENGTH_SHORT).show();
+        retrieveAccounts(info.getPin());
     }
 
     @Override
@@ -82,6 +86,7 @@ public class Home extends AppCompatActivity implements TextToSpeech.OnInitListen
         if (id == R.id.fundNow) {
             Intent intent  = new Intent(Home.this,FundActivity.class);
             intent.putExtra("Type","Touch");
+            intent.putParcelableArrayListExtra("Account", list);
             startActivityForResult(intent, 200);
             return true;
         }
@@ -95,7 +100,13 @@ public class Home extends AppCompatActivity implements TextToSpeech.OnInitListen
         startActivityForResult(checkIntent, MY_DATA_CHECK_CODE);
     }
 
-
+    public void retrieveAccounts(String pin){
+        RequestParams params = new RequestParams(AppConstants.baseurl, "POST");
+        this.function = AppConstants.FUNCTION_GETACCOUNTS;
+        params.setUrl(this.function);
+        params.addParams("pin", pin);
+        new RestClient(Home.this,AppConstants.FUNCTION_SESSION).execute(params);
+    }
 
     private void promptSpeechInput() {
 
@@ -133,7 +144,8 @@ public class Home extends AppCompatActivity implements TextToSpeech.OnInitListen
                             converted_text.contains("money")){
                         Intent intent  = new Intent(Home.this,FundActivity.class);
                         intent.putExtra("Type","Voice");
-                        startActivityForResult(intent, 200);
+                        intent.putParcelableArrayListExtra("Account",list);
+                        startActivityForResult(intent, 2000);
                     }
 
                 }
@@ -152,7 +164,14 @@ public class Home extends AppCompatActivity implements TextToSpeech.OnInitListen
                         startActivity(installIntent);
                     }
                 }
+                break;
             }
+
+            case 2000:
+                if(mTts!=null){
+                    mTts.shutdown();
+                }
+
 
         }
     }
@@ -170,7 +189,19 @@ public class Home extends AppCompatActivity implements TextToSpeech.OnInitListen
             mTts.setLanguage(Locale.US);
             HashMap<String, String> params = new HashMap<>();
             params.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "stringId");
-            mTts.speak("How can I help you today", TextToSpeech.QUEUE_FLUSH, params);
+            Calendar c = Calendar.getInstance();
+            int timeOfDay = c.get(Calendar.HOUR_OF_DAY);
+            String greeting= "Good Morning";
+            if (timeOfDay >= 0 && timeOfDay < 12) {
+                greeting= "Good Morning";
+            } else if (timeOfDay >= 12 && timeOfDay < 16) {
+                greeting= "Good Afternoon";
+            } else if (timeOfDay >= 16 && timeOfDay < 21) {
+                greeting = "Good Evening";
+            } else if (timeOfDay >= 21 && timeOfDay < 24) {
+                greeting = "Good Night";
+            }
+            mTts.speak(greeting+ " Mr. " + info.getLastname()+ " How can I help you today", TextToSpeech.QUEUE_FLUSH, params);
             mTts.setOnUtteranceCompletedListener(new TextToSpeech.OnUtteranceCompletedListener() {
                 @Override
                 public void onUtteranceCompleted(String utteranceId) {
@@ -184,9 +215,26 @@ public class Home extends AppCompatActivity implements TextToSpeech.OnInitListen
             });
 
         }else {
-            Log.d("error", "eror");
+            Log.d("error", "error");
         }
     }
 
+    @Override
+    public void doAction(String output, String function) {
+        ArrayList<UserAccounts> accounts = UserAccounts.getListOfAccounts(output);
+        list= accounts;
+        if(accounts!=null) {
 
+            adapter = new ListAdapter(Home.this,R.layout.listrow,accounts);
+            listView.setAdapter(adapter);
+            adapter.setNotifyOnChange(true);
+            double bal=0.0;
+            for(UserAccounts acc:accounts){
+                bal = bal+ acc.getBalance();
+            }
+            DecimalFormat df2 = new DecimalFormat("###.##");
+            bal = Double.valueOf(df2.format(bal));
+            balance.setText("$ " + bal);
+        }
+    }
 }

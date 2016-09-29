@@ -158,14 +158,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Confirmation Number"
+            android:text="Confirmation"
             android:textAppearance="@android:style/TextAppearance.DeviceDefault.Large" />
 
         <TextView
             android:id="@+id/confirmation"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="2"
+            android:layout_weight="1"
             android:textAppearance="@android:style/TextAppearance.DeviceDefault.Medium" />
     </LinearLayout>
 

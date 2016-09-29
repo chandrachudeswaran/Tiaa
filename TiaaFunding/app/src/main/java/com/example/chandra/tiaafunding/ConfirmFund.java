@@ -80,17 +80,20 @@ public class ConfirmFund extends AppCompatActivity implements TextToSpeech.OnIni
         setResult(RESULT_CANCELED, intent);
         finish();
     }
-    public void initiateTransfer(){
+    public void initiateTransfer(String type){
         Intent intent = new Intent(ConfirmFund.this, StatusActivity.class);
         intent.putExtra("from", from.getText().toString());
         intent.putExtra("to", to.getText().toString());
         intent.putExtra("amount", amount.getText().toString());
         intent.putExtra("date", date.getText().toString());
+        if(type!=null){
+            intent.putExtra("Type",type);
+        }
         startActivityForResult(intent, 2000);
     }
 
     public void doTransfer(View view) {
-        initiateTransfer();
+        initiateTransfer(null);
     }
 
     @Override
@@ -113,6 +116,9 @@ public class ConfirmFund extends AppCompatActivity implements TextToSpeech.OnIni
             }
             case 2000: {
                 if (resultCode == RESULT_OK) {
+                    if(mTts!=null){
+                        mTts.shutdown();
+                    }
                     Intent intent = new Intent();
                     setResult(RESULT_OK,intent);
                     finish();
@@ -127,7 +133,7 @@ public class ConfirmFund extends AppCompatActivity implements TextToSpeech.OnIni
                     Log.d("Voice Input Text: ", converted_text);
                     converted_text = converted_text.toLowerCase();
                     if(converted_text.contains("yes") || converted_text.contains("confirm")|| converted_text.contains("sure") || converted_text.contains("go ahead")){
-                        initiateTransfer();
+                        initiateTransfer("Voice");
                     }else{
                         goBack();
                     }

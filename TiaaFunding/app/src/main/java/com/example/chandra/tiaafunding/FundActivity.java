@@ -12,6 +12,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CalendarView;
 import android.widget.EditText;
@@ -20,6 +21,12 @@ import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.example.chandra.tiaafunding.dto.UserAccounts;
+import com.example.chandra.tiaafunding.dto.UserInfo;
+import com.example.chandra.tiaafunding.network.RequestParams;
+import com.example.chandra.tiaafunding.network.RestClient;
+import com.example.chandra.tiaafunding.util.SharedPreferenceHelper;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -31,7 +38,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
-public class FundActivity extends AppCompatActivity implements TextToSpeech.OnInitListener{
+public class FundActivity extends AppCompatActivity implements TextToSpeech.OnInitListener,RestClient.TransferToActivity{
 
     Spinner fromSpinner;
     Spinner toSpinner;
@@ -47,9 +54,10 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
     public String voiceText;
     private final int MY_DATA_CHECK_CODE= 1200;
     String tex;
-
-    List<Account> targetAccounts;
-    List<Account> achSetupAccounts;
+    String function;
+    String toFundAccount;
+    ArrayList<UserAccounts> targetAccounts;
+    ArrayList<UserAccounts> achSetupAccounts;
 
     public int activity;
     @Override
@@ -70,16 +78,38 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
         parent = (LinearLayout)findViewById(R.id.calendar);
         toBalance = (TextView)findViewById(R.id.toBalance);
         //Retrieve Client accounts
-        Account account = new Account();
-        targetAccounts = account.getListOfAccount();
-        achSetupAccounts = account.getAchSetupAccounts();
+
+        if(getIntent().getExtras()!=null){
+            if(getIntent().getExtras().getParcelableArrayList("Account")!=null){
+                targetAccounts = getIntent().getExtras().getParcelableArrayList("Account");
+                Log.d("g", targetAccounts.toString());
+                addToAccount();
+            }
+        }
+
+
+        toSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                Log.d("Position",position+"");
+                if(position<3) {
+                    toFundAccount = targetAccounts.get(position).getAccountnumber();
+                    SharedPreferenceHelper.putSharedPreferences(
+                            FundActivity.this,String.valueOf(targetAccounts.get(position).getBalance()));
+                    retrieveLinkedAccounts(toFundAccount);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
 
         Date cdate = new Date();
         DateFormat dateFormat = new SimpleDateFormat("MM-dd-yyyy");
         date.setText(dateFormat.format(cdate));
-
-        addFromAccount();
-        addToAccount();
 
         if(getIntent().getExtras()!=null){
             if (getIntent().getExtras().getString("Type") != null) {
@@ -105,27 +135,41 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
     }
 
+
+    public void retrieveLinkedAccounts(String acno){
+        RequestParams params = new RequestParams(AppConstants.baseurl, "POST");
+        this.function = AppConstants.FUNCTION_GETLINKEDACCOUNTS;
+        params.setUrl(this.function);
+        params.addParams("accountnumber", acno);
+        new RestClient(FundActivity.this,AppConstants.FUNCTION_GETLINKEDACCOUNTS).execute(params);
+    }
+
     public void addFromAccount() {
         fromSpinner = (Spinner) findViewById(R.id.fromAccount);
         fromList = new ArrayList<>();
-        for(Account account:achSetupAccounts){
-            fromList.add(account.getTypeOfAccount()+ " - "+ account.getAccountnumber());
+        for(UserAccounts account:achSetupAccounts){
+            fromList.add(account.getBankname()+ " "+ account.getTypeOfAccount()+ " - "+ account.getAccountnumber());
         }
-
+        fromList.add(" ");
         ArrayAdapter<String> dataAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, fromList);
         dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         fromSpinner.setAdapter(dataAdapter);
+        fromSpinner.setSelection(fromList.size()-1);
+
     }
 
     public void addToAccount() {
         toSpinner = (Spinner) findViewById(R.id.toAccount);
         toList = new ArrayList<>();
-        for(Account t:targetAccounts){
-            toList.add(t.getTypeOfAccount()+ "  - "+ t.getAccountnumber());
+        for(UserAccounts t:targetAccounts){
+            toList.add(t.getTypeOfAccount() + "  - " + t.getAccountnumber());
         }
+        toList.add(" ");
         ArrayAdapter<String> dataAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, toList);
         dataAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         toSpinner.setAdapter(dataAdapter);
+        toSpinner.setSelection(toList.size()-1);
+
     }
 
     @Override
@@ -208,8 +252,8 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     converted_text = converted_text.toLowerCase();
 
                     int j=0;
-                    for(Account account:achSetupAccounts){
-                        String type = account.getTypeOfAccount().toLowerCase();
+                    for(UserAccounts account:achSetupAccounts){
+                        String type = account.getBankname()+ " "+ account.getTypeOfAccount().toLowerCase();
                         if(type.contains(converted_text)){
                             j++;
                         }
@@ -245,23 +289,61 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     String converted_text = (result.get(0));
                     converted_text = converted_text.toLowerCase();
                     Log.d("Voice Input Text: ", converted_text);
-                    int i = 0;
+                    try {
+                        int number = Integer.parseInt(converted_text);
+                        toSpinner.setSelection(number-1);
+                        toFundAccount = targetAccounts.get(number-1).getAccountnumber();
+                        activity =300;
+                        StringBuilder sb = new StringBuilder();
+                        sb.append(AppConstants.amountText);
+                        sb.append(" to your ");
+                        sb.append(targetAccounts.get(number-1).getTypeOfAccount() + " account");
 
-                    for(Account temp : targetAccounts){
+                        promptVoiceInput(sb.toString());
+                        break;
+                    } catch (NumberFormatException e) {
+                    }
+
+                    int i = 0;
+                    for(UserAccounts temp : targetAccounts){
                         String type = temp.getTypeOfAccount().toLowerCase();
                         if(type.contains(converted_text)){
                             toSpinner.setSelection(i);
+                            toFundAccount = targetAccounts.get(i).getAccountnumber();
                             break;
                         }else{
                             i++;
                         }
                     }
-                    activity =300;
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(AppConstants.amountText);
-                    sb.append(" to your ");
-                    sb.append(targetAccounts.get(i).getTypeOfAccount()+" account");
-                    promptVoiceInput(sb.toString());
+
+                    if(i>=3){
+                        activity=200;
+                        StringBuilder sb = new StringBuilder();
+                        sb.append("I didn't get your response. You have ");
+                        sb.append(targetAccounts.size()+"");
+                        sb.append(" accounts. To which account do you want to transfer?");
+                        sb.append("Please Say ");
+                        int size= targetAccounts.size();
+                        for (int z=0;z<size;z++){
+                            int number = z+1;
+                            if(z==size-1){
+                                sb.append(" or " + number+ " for "+ targetAccounts.get(z).getTypeOfAccount()+" account");
+                            }else{
+
+                                sb.append(" "+ number+" for "+ targetAccounts.get(z).getTypeOfAccount()+ ",");
+                            }
+                        }
+                        promptVoiceInput(sb.toString());
+
+                    }else{
+                        activity =300;
+                        StringBuilder sb = new StringBuilder();
+                        sb.append(AppConstants.amountText);
+                        sb.append(" to your ");
+                        sb.append(targetAccounts.get(i).getTypeOfAccount()+" account");
+                        promptVoiceInput(sb.toString());
+                    }
+
                 }
                 break;
             }
@@ -275,9 +357,9 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
                      tex = converted_text;
                     converted_text= converted_text.replace(",","");
                     int number = Integer.parseInt(converted_text);
-                    if(number > 5000){
+                    if(number > 5500){
                         activity=400;
-                        StringBuilder sb = new StringBuilder("Your transfer limit for the account is $5000. Do you want to transfer $5000?");
+                        StringBuilder sb = new StringBuilder("Your transfer limit for the account is $5500. Do you want to transfer $5500?");
                         promptVoiceInput(sb.toString());
                     }else{
                         processAmount(tex);
@@ -293,7 +375,7 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
                     Log.d("Voice Input Text: ", converted_text);
                     converted_text = converted_text.toLowerCase();
                     if(converted_text.contains("yes") || converted_text.contains("confirm")|| converted_text.contains("sure") || converted_text.contains("go ahead")){
-                        tex= "5000";
+                        tex= "5500";
                         processAmount(tex);
                     }else{
                         activity =300;
@@ -309,6 +391,9 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
             case 2000: {
                 if (resultCode == RESULT_OK) {
+                    if(mTts!=null){
+                        mTts.shutdown();
+                    }
                     Intent intent = new Intent();
                     setResult(RESULT_OK,intent);
                     finish();
@@ -341,9 +426,9 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
         int size= achSetupAccounts.size();
         for (int i=0;i<size;i++){
             if(i==size-1){
-                sb.append("or " + achSetupAccounts.get(i).getTypeOfAccount()+" account");
+                sb.append("or " +achSetupAccounts.get(i).getBankname()+ " "+ achSetupAccounts.get(i).getTypeOfAccount()+" account");
             }else{
-                sb.append(achSetupAccounts.get(i).getTypeOfAccount()+ ",");
+                sb.append(achSetupAccounts.get(i).getBankname()+ " "+ achSetupAccounts.get(i).getTypeOfAccount()+ ",");
             }
         }
         promptVoiceInput(sb.toString());
@@ -395,5 +480,13 @@ public class FundActivity extends AppCompatActivity implements TextToSpeech.OnIn
         }else {
             Log.d("error", "error");
         }
+    }
+
+    @Override
+    public void doAction(String output, String function) {
+        ArrayList<UserAccounts> linkedList = UserAccounts.getListOfAccounts(output);
+        achSetupAccounts = linkedList;
+        addFromAccount();
+
     }
 }

@@ -8,18 +8,21 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
+import com.example.chandra.tiaafunding.dto.UserAccounts;
+
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by chandra on 9/7/2016.
  */
-public class ListAdapter extends ArrayAdapter<Account> {
+public class ListAdapter extends ArrayAdapter<UserAccounts> {
 
     Context context;
     int resource;
-    ArrayList<Account> list;
+    List<UserAccounts> list;
 
-    public ListAdapter(Context context, int resource, ArrayList<Account> objects){
+    public ListAdapter(Context context, int resource, List<UserAccounts> objects){
         super(context,resource,objects);
         this.context=context;
         this.resource=resource;
